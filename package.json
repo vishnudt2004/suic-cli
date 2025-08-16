@@ -1,6 +1,6 @@
 {
   "name": "suic-cli",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Simple UI Components - CLI installer",
   "keywords": [
     "suic",
@@ -8,17 +8,18 @@
     "ui",
     "simple-ui-components",
     "components",
-    "react"
+    "react",
+    "tailwindcss"
   ],
-  "homepage": "https://suic-docs.vercel.app",
+  "homepage": "https://suic-docs.vercel.app/docs/cli",
   "bugs": {
-    "url": "https://github.com/vishnudt2004/suic-core/issues"
+    "url": "https://github.com/vishnudt2004/suic-cli/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vishnudt2004/suic-core.git"
+    "url": "git+https://github.com/vishnudt2004/suic-cli.git"
   },
-  "license": "ISC",
+  "license": "MIT",
   "author": "Vishnu D <vishnu.d.t.2004@gmail.com>",
   "type": "commonjs",
   "main": "dist/cli.js",

@@ -1,11 +1,10 @@
 import fs from "fs";
 import path from "path";
 import fetch from "node-fetch";
-import { logger } from "./logger";
 
 export interface ComponentEntry {
   component_name: string;
-  file: string;
+  file_name: string;
 }
 
 export async function fetchRegistry(
@@ -16,7 +15,7 @@ export async function fetchRegistry(
   const components = (await res.json()) as ComponentEntry[];
   if (
     !Array.isArray(components) ||
-    !components.every((c) => c.component_name && c.file)
+    !components.every((c) => c.component_name && c.file_name)
   ) {
     throw new Error(
       "Component registry format is invalid. Please try again later."
@@ -40,12 +39,12 @@ export async function addComponents(
 
   for (const entry of components) {
     try {
-      const url = `${GITHUB_RAW_BASE}/${entry.file}`;
+      const url = `${GITHUB_RAW_BASE}/${entry.file_name}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch");
 
       const code = await res.text();
-      fs.writeFileSync(path.join(destDir, entry.file), code);
+      fs.writeFileSync(path.join(destDir, entry.file_name), code);
       added.push(entry.component_name);
     } catch (err: any) {
       failed.push(entry.component_name);
