@@ -1,0 +1,44 @@
+{
+  "name": "suic-cli",
+  "version": "0.1.0",
+  "description": "Simple UI Components - CLI installer",
+  "keywords": [
+    "suic",
+    "sui",
+    "ui",
+    "simple-ui-components",
+    "components",
+    "react"
+  ],
+  "homepage": "https://suic-docs.vercel.app",
+  "bugs": {
+    "url": "https://github.com/vishnudt2004/suic-core/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vishnudt2004/suic-core.git"
+  },
+  "license": "ISC",
+  "author": "Vishnu D <vishnu.d.t.2004@gmail.com>",
+  "type": "commonjs",
+  "main": "dist/cli.js",
+  "bin": {
+    "suic-cli": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:cli": "node dist/cli.js"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@types/prompts": "^2.4.9",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "chalk": "^5.5.0",
+    "commander": "^14.0.0",
+    "node-fetch": "^3.3.2",
+    "prompts": "^2.4.2"
+  }
+}
