@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { constants } from "../constants";
 import { ConfigType } from "../lib/types";
-import { ContextError } from "./error-handler";
+import { CLIError } from "./error-handler";
 
 export function getConfig(): ConfigType {
   const configPath = path.join(process.cwd(), constants.CONFIG_FILE);
@@ -51,6 +51,6 @@ export function createConfig(userInput?: Partial<ConfigType>): ConfigType {
 
     return config;
   } catch (err) {
-    throw new ContextError(err, "create config file");
+    throw new CLIError("Failed to create config file", err);
   }
 }

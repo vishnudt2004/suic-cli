@@ -5,7 +5,7 @@ import { logger } from "./logger";
 import { InitRegistry } from "../lib/types";
 import { constants } from "../constants";
 import { buildUrl } from "./url-utils";
-import { ContextError } from "./error-handler";
+import { CLIError } from "./error-handler";
 
 // Fetch init registry (global setup files)
 export async function fetchInitRegistry(url: string): Promise<any> {
@@ -13,7 +13,7 @@ export async function fetchInitRegistry(url: string): Promise<any> {
     const { data } = await axios.get(url);
     return data;
   } catch (err) {
-    throw new ContextError(err, "fetch init registry");
+    throw new CLIError("Failed to fetch init registry", err);
   }
 }
 
@@ -23,7 +23,7 @@ export async function fetchComponentsRegistry(url: string): Promise<any> {
     const { data } = await axios.get(url);
     return data;
   } catch (err) {
-    throw new ContextError(err, "fetch components registry");
+    throw new CLIError("Failed to fetch components registry", err);
   }
 }
 
@@ -32,7 +32,7 @@ export async function fetchFileData(url: string): Promise<string | any> {
     const { data } = await axios.get(url, { responseType: "text" });
     return data;
   } catch (err) {
-    throw new ContextError(err, "fetch file data");
+    throw new CLIError(`Failed to fetch file data from ${url}`, err);
   }
 }
 

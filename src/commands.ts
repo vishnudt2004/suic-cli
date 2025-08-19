@@ -9,15 +9,16 @@ import {
   askSelect,
 } from "./utils/prompt-handler";
 import { logger } from "./utils/logger";
-import { ContextError } from "./utils/error-handler";
+import { CLIError } from "./utils/error-handler";
 import {
   fetchInitRegistry,
   fetchComponentsRegistry,
   installInitFiles,
 } from "./utils/fetch";
 import { getConfig, createConfig } from "./utils/config";
-import { constants } from "./constants";
+import { cliUi, constants } from "./constants";
 import { buildUrl } from "./utils/url-utils";
+import chalk from "chalk";
 
 export interface ComponentRegistryEntry {
   name: string;
@@ -35,13 +36,14 @@ const initRegUrl = buildUrl(constants.BASE_URL, constants.INIT_REG_FILE);
 export function registerCommands(program: Command) {
   // INIT COMMAND
   program
-    .command("init")
+    .command(cliUi.commands.init)
     .description("Set up Simple UI Components in your project")
     .option(
       "-i, --install-path <path>",
       "Custom installation directory",
       constants.DEFAULT_INSTALL_PATH
     )
+    .addHelpText("after", cliUi.helpText)
     .action(async (opts) => {
       try {
         const confirmed = await askConfirm(
@@ -69,7 +71,7 @@ export function registerCommands(program: Command) {
           `Simple UI Components setup initialized in '${installPath}'.\nRun 'suic-cli add [components...]' to start using components.`
         );
       } catch (err) {
-        throw new ContextError(err, "initialization");
+        throw new CLIError("Error in initialization", err);
       }
     });
 

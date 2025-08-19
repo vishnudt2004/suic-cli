@@ -1,40 +1,30 @@
 import { logger } from "./logger";
 import { ENV } from "../constants";
 
-export class ContextError extends Error {
-  context: string;
-
-  constructor(err: unknown, context: string) {
-    const message = err instanceof Error ? err.message : String(err);
+export class CLIError extends Error {
+  cause?: unknown;
+  constructor(message: string, cause?: unknown) {
     super(message);
-    this.name = "ContextError";
-    this.context = context;
-
-    // preserve original stack if available
-    if (err instanceof Error && err.stack) {
-      this.stack = err.stack;
-    } else if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, ContextError);
-    }
+    if (cause instanceof Error) this.cause = cause;
   }
 }
 
-export function handleError(err: unknown): void {
-  if (err instanceof ContextError) {
-    if (ENV.MODE === "DEV") {
-      logger.error(`Error in ${err.context}:`, err); // full error + context
-    } else {
-      logger.error(`Error in ${err.context}: ${err.message}`); // minimal
+export function handleError(err: unknown, level = 0) {
+  const indent = "  ".repeat(level);
+  const isDev = ENV.MODE === "DEV";
+
+  if (err instanceof Error) {
+    logger.error(`${indent} ${err.message}`);
+    if (isDev && (err as any).cause) {
+      handleError((err as any).cause, level + 1);
     }
-  } else if (err instanceof Error) {
-    if (ENV.MODE === "DEV") {
-      logger.error("Error:", err); // full error
-    } else {
-      logger.error(err.message); // minimal
+    if (isDev && err.stack && level === 0) {
+      logger.break();
+      logger.error(err.stack);
     }
   } else {
-    logger.error(String(err));
+    logger.error(`${indent} ${String(err)}`);
   }
 
-  process.exit(1);
+  if (level === 0) process.exit(1);
 }

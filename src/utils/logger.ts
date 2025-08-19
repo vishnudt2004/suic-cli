@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { ENV } from "../constants";
 
-const prefix = chalk.gray("[suic-cli]");
+const prefix = `[${chalk.bgGray(" suic ")}]`;
 
 export const logger = {
   info: (msg: string) => {
@@ -19,9 +19,5 @@ export const logger = {
       console.error(chalk.gray(err.stack || err.message));
     }
   },
-  debug: (msg: string) => {
-    if (ENV.MODE === "DEV") {
-      console.log(prefix, chalk.magenta("🐞 DEBUG:", msg));
-    }
-  },
+  break: (n: number = 1, char: string = "\n") => console.log(char.repeat(n)),
 };
