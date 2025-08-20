@@ -11,7 +11,7 @@ export type InitRegistry = {
   peerDependencies?: Record<string, string>;
 };
 
-export type ComponentsRegistry = {
+export type ComponentsRegistryEntry = {
   name: string;
   description: string;
   files: string[];

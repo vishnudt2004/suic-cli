@@ -7,3 +7,14 @@ export function buildUrl(base: string, ...paths: string[]): string {
 
   return url.toString();
 }
+
+export function extractFilePathFromUrl(url: string): string {
+  const { pathname } = new URL(url);
+
+  const parts = pathname.split("/main/");
+  if (parts.length < 2) {
+    throw new Error(`Could not extract file path from url: ${url}`);
+  }
+
+  return parts[1];
+}

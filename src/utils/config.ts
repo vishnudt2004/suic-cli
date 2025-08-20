@@ -1,15 +1,20 @@
 import fs from "fs";
 import path from "path";
+import chalk from "chalk";
 import { constants } from "../constants";
 import { ConfigType } from "../lib/types";
 import { CLIError } from "./error-handler";
 
+const configFile = constants.CONFIG_FILE;
+
 export function getConfig(): ConfigType {
-  const configPath = path.join(process.cwd(), constants.CONFIG_FILE);
+  const configPath = path.join(process.cwd(), configFile);
 
   if (!fs.existsSync(configPath)) {
     throw new Error(
-      `Config file not found at ${configPath}. Run \`suic-cli init\` first.`
+      `Config file not found at ./${configFile}. Run '${chalk.cyanBright(
+        "suic-cli init"
+      )}' first.`
     );
   }
 
@@ -21,12 +26,11 @@ export function getConfig(): ConfigType {
     return parsed;
   } catch (err) {
     throw new Error(
-      `Invalid config file format at ${configPath}: ${
-        (err as Error).message
-      } ` +
-        `Try reinitializing the project with \`suic-cli init\`. ` +
-        `Warning: this may overwrite modified data. ` +
-        `Alternatively, you can manually edit the config by following the guide: <url>`
+      `Invalid config at ./${configFile}.\n  Run '${chalk.cyanBright(
+        "suic-cli init"
+      )}' to reinitialize (${chalk.yellow(
+        "may overwrite changes"
+      )}) or fix manually by following the docs.`
     );
   }
 }
@@ -44,7 +48,7 @@ export function createConfig(userInput?: Partial<ConfigType>): ConfigType {
     };
 
     fs.writeFileSync(
-      path.join(cwd, constants.CONFIG_FILE),
+      path.join(cwd, configFile),
       JSON.stringify(config, null, 2),
       "utf-8"
     );

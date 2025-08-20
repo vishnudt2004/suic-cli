@@ -23,15 +23,9 @@ program
   .addHelpText("beforeAll", `\n${cliUi.logo}\n`)
   .description(`Manage and install UI components effortlessly.`)
   .addHelpText("after", cliUi.helpText)
-  .version(cliUi.version)
-  .showHelpAfterError()
-  .showSuggestionAfterError();
+  .version(cliUi.version);
 
-try {
-  registerCommands(program);
-} catch (e) {
-  handleError(e);
-}
+registerCommands(program);
 
 (async () => {
   try {

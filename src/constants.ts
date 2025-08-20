@@ -1,7 +1,7 @@
 import chalk from "chalk";
 
 export const ENV = {
-  MODE: process.env.NODE_ENV === "production" ? "PROD" : "DEV",
+  MODE: "PROD",
 };
 
 export const constants = {

@@ -1,5 +1,5 @@
 import { logger } from "./logger";
-import { ENV } from "../constants";
+import { cliUi, ENV } from "../constants";
 
 export class CLIError extends Error {
   cause?: unknown;
@@ -38,5 +38,5 @@ export function handleError(err: unknown, level = 0) {
     logger.error(`${String(err)}`);
   }
 
-  if (level === 0) process.exit(1);
+  if (level === 0) console.log(cliUi.helpText);
 }
