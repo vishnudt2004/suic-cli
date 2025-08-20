@@ -21,17 +21,6 @@ export async function installInitFiles(
     fs.writeFileSync(targetPath, content, "utf-8");
   }
 
-  // Create empty components.ts for export handling
-  const componentsFile = path.join(cwd, installPath, "components.ts");
-  fs.mkdirSync(path.dirname(componentsFile), { recursive: true });
-  if (!fs.existsSync(componentsFile)) {
-    fs.writeFileSync(
-      componentsFile,
-      "// exports for suic components\n",
-      "utf-8"
-    );
-  }
-
   // Add path alias in tsconfig.json
   const tsconfigPath = path.join(cwd, "tsconfig.json");
   if (fs.existsSync(tsconfigPath)) {
@@ -88,26 +77,6 @@ export async function installComponentFiles(
     fs.mkdirSync(path.dirname(targetPath), { recursive: true });
     fs.writeFileSync(targetPath, content, "utf-8");
     // logger.info(`Added ${path.relative(cwd, targetPath)}`);
-  }
-
-  // Update components.ts
-  const indexFile = path.join(cwd, installPath, "components.ts");
-
-  const mainFile = compEntry.files[0]; // Pick the first file as main export
-  const exportPath = mainFile.replace(/\.[^/.]+$/, ""); // Remove file extension: .ts/.tsx/.js/.jsx
-  const exportLine = `export * from "./${exportPath}";\n`;
-
-  if (fs.existsSync(indexFile)) {
-    const current = fs.readFileSync(indexFile, "utf-8");
-    if (!current.includes(exportLine))
-      fs.appendFileSync(indexFile, exportLine, "utf-8");
-  } else {
-    fs.mkdirSync(path.dirname(indexFile), { recursive: true });
-    fs.writeFileSync(
-      indexFile,
-      `// exports for suic components\n${exportLine}`,
-      "utf-8"
-    );
   }
 
   return "installed";
