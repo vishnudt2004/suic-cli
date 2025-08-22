@@ -53,7 +53,7 @@ export const logger = {
       "error",
       indent
     ),
-  break: (n: number = 0) => console.log("\n".repeat(n)),
+  break: (n: number = 0) => console.log("\n".repeat(n)), // n=1 prints 2 line breaks
   divider: (
     n: number = 30,
     char: string = "_",

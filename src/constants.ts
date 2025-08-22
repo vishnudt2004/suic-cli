@@ -1,7 +1,7 @@
 import chalk from "chalk";
 
 export const ENV = {
-  MODE: "PROD",
+  MODE: "DEV",
 };
 
 export const constants = {
@@ -12,6 +12,13 @@ export const constants = {
   COMPS_REG_FILE: "registries/components.json",
   CONFIG_FILE: "suic.config.json",
   DEFAULT_INSTALL_PATH: "/src/suic",
+
+  // CLIENT
+  INSTALLED_REG_FILE: ".suic/installed-registry.json",
+  SUIC_TS_ALIAS: {
+    alias: "suic/*",
+    value: (installPath: string) => `${installPath}/*`,
+  },
 };
 
 export const cliUi = {
@@ -24,9 +31,4 @@ export const cliUi = {
     "Documentation:"
   )} ${chalk.underline.hex("#60a5fa")(constants.CLI_DOCS_URL)}\n`,
   version: chalk.green("1.0.0"),
-  commands: {
-    init: "init",
-    add: "add",
-    remove: "remove",
-  },
 };
