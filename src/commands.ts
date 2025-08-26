@@ -34,6 +34,12 @@ const initRegUrl = buildUrl(baseUrl, INIT_REG_FILE);
 const componentsRegUrl = buildUrl(baseUrl, COMPS_REG_FILE);
 const cwd = process.cwd();
 
+const DEP_KEYS = [
+  "dependencies",
+  "devDependencies",
+  "peerDependencies",
+] as const;
+
 const init: CommandDef = {
   command: "init",
   description: "Set up Simple UI Components in your project",
@@ -179,9 +185,7 @@ const add: CommandDef = {
       updateInstalledRegistry(comp, installedRegistryPath, "add");
 
       // collect req. deps
-      (
-        ["dependencies", "devDependencies", "peerDependencies"] as const
-      ).forEach((key) => Object.assign(reqdDeps[key], comp[key] ?? {}));
+      DEP_KEYS.forEach((key) => Object.assign(reqdDeps[key], comp[key] ?? {}));
     }
 
     logger.break();
@@ -273,9 +277,7 @@ const remove: CommandDef = {
 
     // collect remaining deps, files
     for (const comp of Object.values(installedRegistry)) {
-      (
-        ["dependencies", "devDependencies", "peerDependencies"] as const
-      ).forEach((key) =>
+      DEP_KEYS.forEach((key) =>
         Object.assign(deps.remainingDeps[key], comp[key] ?? {})
       );
       files.remainingFiles.push(...comp.files);
@@ -297,17 +299,13 @@ const remove: CommandDef = {
 
       // collect removed deps, files
       const comp = installedRegistry[regName];
-      (
-        ["dependencies", "devDependencies", "peerDependencies"] as const
-      ).forEach((key) =>
+      DEP_KEYS.forEach((key) =>
         Object.assign(deps.allRemovedDeps[key], comp[key] ?? {})
       );
       files.allRemovedFiles.push(...comp.files);
 
       // subtract from remaining deps, files
-      (
-        ["dependencies", "devDependencies", "peerDependencies"] as const
-      ).forEach((key) => {
+      DEP_KEYS.forEach((key) => {
         for (const pkg of Object.keys(comp[key] ?? {})) {
           delete deps.remainingDeps[key][pkg];
         }
