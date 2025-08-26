@@ -15,7 +15,7 @@ export const constants = {
 
   // CLIENT
   INSTALLED_REG_FILE: ".suic/installed-registry.json",
-  SUIC_TS_ALIAS: {
+  TS_PATH_ALIAS: {
     alias: "suic/*",
     value: (installPath: string) => `${installPath}/*`,
   },
@@ -30,5 +30,5 @@ export const cliUi = {
   helpText: `\n${chalk.bold.hex("#9CA3AF")(
     "Documentation:"
   )} ${chalk.underline.hex("#60a5fa")(constants.CLI_DOCS_URL)}\n`,
-  version: chalk.green("1.0.0"),
+  version: chalk.green("suic-cli v1.0.0"),
 };

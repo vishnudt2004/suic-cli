@@ -2,7 +2,7 @@ import { logger } from "./logger";
 import { cliUi, ENV } from "../constants";
 
 export class CLIError extends Error {
-  cause?: unknown;
+  cause?: Error;
   constructor(message: string, cause?: unknown) {
     super(message);
     if (cause instanceof Error) this.cause = cause;

@@ -43,7 +43,6 @@ export function createConfig(userInput?: Partial<ConfigType>): ConfigType {
     ).replace(/^[/\\]+/, ""); // strip leading slash
 
     const config: ConfigType = {
-      cwd,
       installPath,
     };
 

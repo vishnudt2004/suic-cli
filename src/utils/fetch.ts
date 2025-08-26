@@ -2,23 +2,15 @@ import axios from "axios";
 import { CLIError } from "./error-handler";
 import { extractFilePathFromUrl } from "./url-utils";
 
-// Fetch init registry (global setup files)
-export async function fetchInitRegistry(url: string): Promise<any> {
+export async function fetchRegistry<T>(
+  url: string,
+  errMessage: string = "Failed to fetch registry"
+): Promise<T> {
   try {
     const { data } = await axios.get(url);
     return data;
   } catch (err) {
-    throw new CLIError("Failed to fetch init registry", err);
-  }
-}
-
-// Fetch components registry (list of available components)
-export async function fetchComponentsRegistry(url: string): Promise<any> {
-  try {
-    const { data } = await axios.get(url);
-    return data;
-  } catch (err) {
-    throw new CLIError("Failed to fetch components registry", err);
+    throw new CLIError(errMessage, err);
   }
 }
 

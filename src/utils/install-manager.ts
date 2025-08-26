@@ -1,68 +1,200 @@
-import fs from "fs";
 import path from "path";
+import fs from "fs";
 import chalk from "chalk";
-import {
+import { constants } from "../constants";
+import { fetchFileData } from "./fetch";
+import { buildUrl } from "./url-utils";
+import { logger } from "./logger";
+import type {
   ComponentsRegistryEntry,
-  InitRegistry,
   InstalledRegistryEntry,
 } from "../lib/types";
-import { constants } from "../constants";
-import { buildUrl } from "./url-utils";
-import { fetchFileData } from "./fetch";
-import { askConfirm } from "./prompt-handler";
-import { logger } from "./logger";
 
-// Log required dependencies for manual install/uninstall
-
-export function logDependencies(
-  description: string,
-  requiredDeps: Pick<
+interface LogDependenciesOptions {
+  description: string;
+  registryDeps: Pick<
     ComponentsRegistryEntry,
     "dependencies" | "devDependencies" | "peerDependencies"
-  >,
-  cwd: string
-) {
-  const { dependencies, devDependencies, peerDependencies } = requiredDeps;
+  >;
+  cwd: string;
+}
 
-  const packageJsonPath = path.join(cwd, "package.json");
-  if (!fs.existsSync(packageJsonPath)) {
+function loadInstalledRegistry(cwd: string) {
+  const installedRegistryPath = path.join(cwd, constants.INSTALLED_REG_FILE);
+  const installedRegistry: Record<string, InstalledRegistryEntry> =
+    fs.existsSync(installedRegistryPath)
+      ? JSON.parse(fs.readFileSync(installedRegistryPath, "utf-8"))
+      : {};
+  return { installedRegistryPath, installedRegistry };
+}
+
+function updateInstalledRegistry(
+  entryOrName: ComponentsRegistryEntry,
+  installedRegistryPath: string,
+  operation: "add"
+): Record<string, InstalledRegistryEntry>;
+function updateInstalledRegistry(
+  entryOrName: string, // raw component name
+  installedRegistryPath: string,
+  operation: "remove"
+): Record<string, InstalledRegistryEntry>;
+function updateInstalledRegistry(
+  entryOrName: ComponentsRegistryEntry | string,
+  installedRegistryPath: string,
+  operation: "add" | "remove"
+) {
+  let registry: Record<string, InstalledRegistryEntry> = {};
+
+  if (operation === "remove" && typeof entryOrName === "string") {
+    if (!fs.existsSync(installedRegistryPath)) return {};
+
+    registry = JSON.parse(fs.readFileSync(installedRegistryPath, "utf-8"));
+    const normalizedRegistry = normalizeName(registry);
+    const compKey = normalizeName(entryOrName);
+
+    if (normalizedRegistry[compKey]) delete registry[entryOrName];
+  } else if (operation === "add" && typeof entryOrName !== "string") {
+    if (fs.existsSync(installedRegistryPath)) {
+      registry = JSON.parse(fs.readFileSync(installedRegistryPath, "utf-8"));
+    }
+
+    registry[entryOrName.name] = {
+      files: entryOrName.files ?? [],
+      dependencies: entryOrName.dependencies ?? {},
+      devDependencies: entryOrName.devDependencies ?? {},
+      peerDependencies: entryOrName.peerDependencies ?? {},
+    };
+  }
+
+  // Save back to file
+  fs.mkdirSync(path.dirname(installedRegistryPath), { recursive: true });
+  fs.writeFileSync(installedRegistryPath, JSON.stringify(registry, null, 2));
+
+  return registry;
+}
+
+async function installFiles(
+  registryFiles: string[],
+  baseUrl: string,
+  targetDir: string
+): Promise<void> {
+  for (const file of registryFiles) {
+    const destPath = path.join(targetDir, file);
+    const fileUrl = buildUrl(baseUrl, file);
+    const content = await fetchFileData(fileUrl);
+
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+    fs.writeFileSync(destPath, content, "utf-8");
+  }
+}
+
+function removeFiles(registryFiles: string[], targetDir: string) {
+  for (const file of registryFiles) {
+    const destPath = path.join(targetDir, file);
+    if (fs.existsSync(destPath)) {
+      fs.unlinkSync(destPath);
+    }
+  }
+}
+
+function removeEmptyDirs(
+  targetDir: string,
+  registryFiles: string[],
+  protectedDirs: string[] = []
+) {
+  // Normalize protected dirs as absolute paths
+  const absProtected = protectedDirs.map((d) =>
+    path.resolve(d).replace(/[/\\]+$/, "")
+  );
+
+  for (const file of registryFiles) {
+    let dir = path.dirname(path.join(targetDir, file));
+
+    while (dir.startsWith(targetDir)) {
+      try {
+        // skip if protected
+        if (absProtected.includes(path.resolve(dir))) break;
+
+        const entries = fs.readdirSync(dir);
+        if (entries.length > 0) break; // stop if not empty
+
+        fs.rmdirSync(dir);
+        dir = path.dirname(dir); // move one level up
+      } catch {
+        break;
+      }
+    }
+  }
+}
+
+function addPathAlias(
+  cwd: string,
+  { alias, value }: { alias: string; value: string }
+): void {
+  const tsconfigPath = path.join(cwd, "tsconfig.json");
+  if (fs.existsSync(tsconfigPath)) {
+    const tsconfigRaw = fs.readFileSync(tsconfigPath, "utf-8");
+    const tsconfig = JSON.parse(tsconfigRaw);
+
+    tsconfig.compilerOptions = tsconfig.compilerOptions || {};
+    tsconfig.compilerOptions.paths = tsconfig.compilerOptions.paths || {};
+
+    if (!tsconfig.compilerOptions.paths[alias]) {
+      tsconfig.compilerOptions.paths[alias] = [value];
+      fs.writeFileSync(
+        tsconfigPath,
+        JSON.stringify(tsconfig, null, 2),
+        "utf-8"
+      );
+    }
+  } else logger.warn("tsconfig.json not found. Skipping path alias.");
+}
+
+function logDependencies({
+  description,
+  registryDeps,
+  cwd,
+}: LogDependenciesOptions): void {
+  const { dependencies, devDependencies, peerDependencies } = registryDeps;
+
+  const pkgPath = path.join(cwd, "package.json");
+  if (!fs.existsSync(pkgPath)) {
     logger.warn(
       "package.json not found. Cannot detect installed dependencies."
     );
   }
 
-  const pkg = fs.existsSync(packageJsonPath)
-    ? JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"))
+  const pkg = fs.existsSync(pkgPath)
+    ? JSON.parse(fs.readFileSync(pkgPath, "utf-8"))
     : { dependencies: {}, devDependencies: {} };
-  const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
+
+  const installedDeps = { ...pkg.dependencies, ...pkg.devDependencies };
 
   const printDeps = (
     deps: Record<string, string> | undefined,
-    type: string
+    label: string
   ) => {
-    if (!deps || Object.keys(deps).length === 0) return;
+    if (!deps || !Object.keys(deps).length) return;
 
-    logger.info(`${type}:`);
+    logger.info(`${label}:`);
+
     for (const [dep, version] of Object.entries(deps)) {
-      const installedVersion = allDeps[dep];
-      if (installedVersion) {
-        console.log(
-          `${" ".repeat(2)} - ${chalk.cyanBright(dep)}@${version} (${chalk.dim(
-            "installed:"
-          )} ${installedVersion})`
-        );
-      } else {
-        console.log(`${" ".repeat(2)} - ${chalk.cyanBright(dep)}@${version}`);
-      }
+      const installedVersion = installedDeps[dep];
+      const reqd = `${chalk.cyanBright(dep)}@${version}`;
+      const installed = installedVersion
+        ? ` (${chalk.dim(`installed: ${installedVersion}`)})`
+        : "";
+      logger.log(`${reqd}${installed}`, { level: 1 }, "●");
     }
-    logger.break(); // spacing
+
+    logger.break();
   };
 
-  if (
-    Object.keys(dependencies || {}).length ||
-    Object.keys(devDependencies || {}).length ||
-    Object.keys(peerDependencies || {}).length
-  ) {
+  const hasAnyDeps = [dependencies, devDependencies, peerDependencies].some(
+    (d) => Object.keys(d || {}).length > 0
+  );
+
+  if (hasAnyDeps) {
     logger.break();
     logger.warn(description);
     logger.break();
@@ -73,226 +205,35 @@ export function logDependencies(
   printDeps(peerDependencies, "Peer Dependencies");
 }
 
-export function getUnusedDeps(
-  batchDeps: Pick<
-    InstalledRegistryEntry,
-    "dependencies" | "devDependencies" | "peerDependencies"
-  >,
-  installedRegistry: Record<string, InstalledRegistryEntry>,
-  toRemove: string[]
-) {
-  const unusedDeps: Pick<
-    InstalledRegistryEntry,
-    "dependencies" | "devDependencies" | "peerDependencies"
-  > = {
-    dependencies: {},
-    devDependencies: {},
-    peerDependencies: {},
-  };
+function normalizeName(property: string): string;
+function normalizeName<T extends { name: string }>(property: T[]): T[];
+function normalizeName<T extends Record<string, any>>(
+  property: T
+): Record<string, any>;
+function normalizeName(property: any): any {
+  // raw string
+  if (typeof property === "string") return property.toLowerCase();
 
-  // Build a map of all deps from remaining components
-  type DepType = Record<string, string>;
-  const remainingDeps: DepType = {};
-  const remainingDevDeps: DepType = {};
-  const remainingPeerDeps: DepType = {};
+  // "name" property
+  if (Array.isArray(property))
+    return property.map((i) => ({ ...i, name: i.name.toLowerCase() }));
 
-  for (const [name, entry] of Object.entries(installedRegistry)) {
-    if (toRemove.map((n) => n.toLowerCase()).includes(name.toLowerCase()))
-      continue;
-    Object.assign(remainingDeps, entry.dependencies ?? {});
-    Object.assign(remainingDevDeps, entry.devDependencies ?? {});
-    Object.assign(remainingPeerDeps, entry.peerDependencies ?? {});
-  }
-
-  // Helper to filter unused deps
-  function filterUnused(batch: DepType, remaining: DepType) {
-    const result: DepType = {};
-    for (const dep of Object.keys(batch)) {
-      if (!remaining[dep]) result[dep] = batch[dep];
-    }
-    return result;
-  }
-
-  unusedDeps.dependencies = filterUnused(
-    batchDeps.dependencies ?? {},
-    remainingDeps
-  );
-  unusedDeps.devDependencies = filterUnused(
-    batchDeps.devDependencies ?? {},
-    remainingDevDeps
-  );
-  unusedDeps.peerDependencies = filterUnused(
-    batchDeps.peerDependencies ?? {},
-    remainingPeerDeps
-  );
-
-  return unusedDeps;
-}
-
-// Installed registry helpers (client registry)
-
-export function createInstalledRegistry(cwd: string): void {
-  const { installedRegistryPath } = loadInstalledRegistry(cwd);
-
-  if (!fs.existsSync(installedRegistryPath)) {
-    fs.mkdirSync(path.dirname(installedRegistryPath), { recursive: true });
-    fs.writeFileSync(
-      installedRegistryPath,
-      JSON.stringify({}, null, 2),
-      "utf-8"
-    );
-  }
-}
-
-export function loadInstalledRegistry(cwd: string) {
-  const installedRegistryPath = path.join(cwd, constants.INSTALLED_REG_FILE);
-  const installedRegistry: Record<string, InstalledRegistryEntry> =
-    fs.existsSync(installedRegistryPath)
-      ? JSON.parse(fs.readFileSync(installedRegistryPath, "utf-8"))
-      : {};
-  return { installedRegistryPath, installedRegistry };
-
-  // throw new CLIError(
-  //   `Installed registry not found at ./${
-  //     constants.INSTALLED_REG_FILE
-  //   }. Run '${chalk.cyanBright("suic-cli init")}' to reinitialize.`
-  // );
-}
-
-export function updateInstalledRegistry(
-  compEntry: ComponentsRegistryEntry,
-  registryPath: string
-) {
-  let registry: Record<string, any> = {};
-
-  // Load existing registry if it exists
-  if (fs.existsSync(registryPath)) {
-    registry = JSON.parse(fs.readFileSync(registryPath, "utf-8"));
-  }
-
-  // Copy only necessary fields
-  registry[compEntry.name] = {
-    files: compEntry.files ?? [],
-    dependencies: compEntry.dependencies ?? {},
-    devDependencies: compEntry.devDependencies ?? {},
-    peerDependencies: compEntry.peerDependencies ?? {},
-  };
-
-  // Save back to file
-  fs.mkdirSync(path.dirname(registryPath), { recursive: true });
-  fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2));
-
-  return registry;
-}
-
-export function removeFromInstalledRegistry(
-  compName: string,
-  registryPath: string
-) {
-  if (!fs.existsSync(registryPath)) return {};
-
-  const registry: Record<string, InstalledRegistryEntry> = JSON.parse(
-    fs.readFileSync(registryPath, "utf-8")
-  );
-
-  // TODO: add lowercase check
-  if (registry[compName]) {
-    delete registry[compName];
-
-    fs.mkdirSync(path.dirname(registryPath), { recursive: true });
-    fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2));
-  }
-
-  return registry;
-}
-
-// installer/uninstaller functions
-
-export async function installInitFiles(
-  registry: InitRegistry,
-  cwd: string,
-  installPath: string
-) {
-  // Install files from registry
-  for (const filePath of registry.files) {
-    const targetPath = path.join(cwd, installPath, filePath);
-    const content = await fetchFileData(buildUrl(constants.BASE_URL, filePath));
-
-    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-    fs.writeFileSync(targetPath, content, "utf-8");
-  }
-
-  // Add path alias in tsconfig.json
-  const tsconfigPath = path.join(cwd, "tsconfig.json");
-  if (fs.existsSync(tsconfigPath)) {
-    const tsconfigRaw = fs.readFileSync(tsconfigPath, "utf-8");
-    const tsconfig = JSON.parse(tsconfigRaw);
-
-    tsconfig.compilerOptions = tsconfig.compilerOptions || {};
-    tsconfig.compilerOptions.paths = tsconfig.compilerOptions.paths || {};
-
-    const { alias, value } = constants.SUIC_TS_ALIAS;
-
-    // Only add if not already present
-    if (!tsconfig.compilerOptions.paths[alias]) {
-      tsconfig.compilerOptions.paths[alias] = [value(installPath)];
-      fs.writeFileSync(
-        tsconfigPath,
-        JSON.stringify(tsconfig, null, 2),
-        "utf-8"
-      );
-    }
-  }
-}
-
-export async function installComponentFiles(
-  compEntry: ComponentsRegistryEntry,
-  installedRegistry: Record<string, InstalledRegistryEntry>,
-  cwd: string,
-  installPath: string
-): Promise<"installed" | "skipped"> {
-  // Check if component is already in installed registry
-  if (installedRegistry[compEntry.name]) {
-    const reinstall = await askConfirm(
-      `Component '${chalk.cyanBright(
-        compEntry.name
-      )}' already installed. Reinstall? (${chalk.yellow(
-        "Warning: modified files will be lost (incl. shared deps)"
-      )})`
-    );
-    if (!reinstall) return "skipped";
-  }
-
-  // Proceed: write files fresh
-  for (const filePath of compEntry.files) {
-    const targetPath = path.join(cwd, installPath, filePath);
-    const content = await fetchFileData(buildUrl(constants.BASE_URL, filePath));
-
-    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-    fs.writeFileSync(targetPath, content, "utf-8");
-  }
-
-  return "installed";
-}
-
-export async function removeComponentFiles(
-  compEntry: { files: string[] },
-  installedRegistry: Record<string, InstalledRegistryEntry>,
-  toRemove: string[],
-  cwd: string,
-  installPath: string
-) {
-  for (const file of compEntry.files ?? []) {
-    const targetPath = path.join(cwd, installPath, file); // build full path
-
-    const usedElsewhere = Object.entries(installedRegistry).some(
-      ([name, other]) =>
-        !toRemove.map((n) => n.toLowerCase()).includes(name.toLowerCase()) &&
-        (other.files ?? []).includes(file)
+  // key
+  if (typeof property === "object" && property !== null)
+    return Object.fromEntries(
+      Object.entries(property).map(([k, v]) => [k.toLowerCase(), v])
     );
 
-    if (!usedElsewhere && fs.existsSync(targetPath)) {
-      fs.unlinkSync(targetPath);
-    }
-  }
+  return property; // fallback
 }
+
+export {
+  loadInstalledRegistry,
+  updateInstalledRegistry,
+  installFiles,
+  removeFiles,
+  removeEmptyDirs,
+  addPathAlias,
+  logDependencies,
+  normalizeName,
+};

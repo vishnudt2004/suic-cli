@@ -1,31 +1,29 @@
 #!/usr/bin/env node
 
-import chalk from "chalk";
 import { Command } from "commander";
-import { registerCommands } from "./commands";
-import { handleError } from "./utils/error-handler";
+import chalk from "chalk";
 import { cliUi } from "./constants";
+import { commands } from "./commands";
+import { registerCli, registerCommand } from "./utils/command-utils";
+import { logger } from "./utils/logger";
+import { handleError } from "./utils/error-handler";
+import type { CLIDef } from "./lib/types";
 
 const program = new Command();
 
-program.configureHelp({
-  styleUsage: (str) => chalk.whiteBright(str),
-  styleSubcommandTerm: (cmdName) => chalk.hex("#c4c4c4")(cmdName),
-  styleOptionTerm: (optName) => chalk.hex("#c4c4c4")(optName),
-  styleTitle: (str) => chalk.bold.hex("#9CA3AF")(str),
-  styleSubcommandDescription: (str) => chalk.white(str),
-  styleOptionDescription: (str) => chalk.white(str),
-  styleDescriptionText: (str) => chalk.cyan(str),
-});
+const cli: CLIDef = {
+  brandLogo: cliUi.logo,
+  name: cliUi.name,
+  description: `Manage and install ${chalk.whiteBright(
+    "Simple UI Components"
+  )} effortlessly.`,
+  helpText: cliUi.helpText,
+  version: cliUi.version,
+};
 
-program
-  .name(cliUi.name)
-  .addHelpText("beforeAll", `\n${cliUi.logo}\n`)
-  .description(`Manage and install UI components effortlessly.`)
-  .addHelpText("after", cliUi.helpText)
-  .version(cliUi.version);
+registerCli(program, cli);
 
-registerCommands(program);
+commands.forEach((command) => registerCommand(program, command));
 
 (async () => {
   try {
@@ -35,10 +33,14 @@ registerCommands(program);
   }
 })();
 
-process.on("unhandledRejection", (err) => {
-  handleError(err);
-});
-
-process.on("uncaughtException", (err) => {
-  handleError(err);
-});
+[
+  { evt: "unhandledRejection", cb: handleError },
+  { evt: "uncaughtException", cb: handleError },
+  {
+    evt: "SIGINT",
+    cb: () => {
+      logger.log("\nExiting...", undefined, chalk.redBright("✖"));
+      process.exit(0);
+    },
+  },
+].forEach(({ evt, cb }) => process.on(evt, cb));

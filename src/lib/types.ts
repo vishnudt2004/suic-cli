@@ -1,5 +1,23 @@
+import { HelpConfiguration } from "commander";
+
+export type CLIDef = {
+  name: string;
+  brandLogo: string;
+  description: string;
+  helpText: string;
+  version: string;
+  style?: HelpConfiguration;
+};
+
+export type CommandDef = {
+  command: string;
+  description: string;
+  options?: { flags: string; description: string; defaultValue?: any }[];
+  action: (...args: any) => Promise<void>;
+  errDescription: string;
+};
+
 export type ConfigType = {
-  cwd: string; // project root
   installPath: string; // e.g., "./components"
 };
 
