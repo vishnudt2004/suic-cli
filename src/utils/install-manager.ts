@@ -9,15 +9,7 @@ import type {
   ComponentsRegistryEntry,
   InstalledRegistryEntry,
 } from "../lib/types";
-
-interface LogDependenciesOptions {
-  description: string;
-  registryDeps: Pick<
-    ComponentsRegistryEntry,
-    "dependencies" | "devDependencies" | "peerDependencies"
-  >;
-  cwd: string;
-}
+const semver = require("semver");
 
 function loadInstalledRegistry(cwd: string) {
   const installedRegistryPath = path.join(cwd, constants.INSTALLED_REG_FILE);
@@ -150,19 +142,20 @@ function addPathAlias(
   } else logger.warn("tsconfig.json not found. Skipping path alias.");
 }
 
-function logDependencies({
-  description,
-  registryDeps,
-  cwd,
-}: LogDependenciesOptions): void {
+type LogDeps = {
+  description: string;
+  registryDeps: Pick<
+    ComponentsRegistryEntry,
+    "dependencies" | "devDependencies" | "peerDependencies"
+  >;
+  cwd: string;
+};
+
+function logDependencies({ description, registryDeps, cwd }: LogDeps): void {
   const { dependencies, devDependencies, peerDependencies } = registryDeps;
 
   const pkgPath = path.join(cwd, "package.json");
-  if (!fs.existsSync(pkgPath)) {
-    logger.warn(
-      "package.json not found. Cannot detect installed dependencies."
-    );
-  }
+  const pkgNotFound = !fs.existsSync(pkgPath);
 
   const pkg = fs.existsSync(pkgPath)
     ? JSON.parse(fs.readFileSync(pkgPath, "utf-8"))
@@ -178,13 +171,44 @@ function logDependencies({
 
     logger.info(`${label}:`);
 
+    type Status =
+      | "ok"
+      | "minorMismatch"
+      | "majorMismatch"
+      | "missing"
+      | "default";
+    type Indicator = Record<Status, string>;
+    const indicator: Indicator = {
+      default: chalk.gray("●"),
+      ok: chalk.green("●"),
+      minorMismatch: chalk.yellow("◑"),
+      majorMismatch: chalk.red("◑"),
+      missing: chalk.red("●"),
+    };
+
     for (const [dep, version] of Object.entries(deps)) {
       const installedVersion = installedDeps[dep];
       const reqd = `${chalk.cyanBright(dep)}@${version}`;
       const installed = installedVersion
         ? ` (${chalk.dim(`installed: ${installedVersion}`)})`
         : "";
-      logger.log(`${reqd}${installed}`, { level: 1 }, "●");
+      const cleanInstalled = installedVersion?.replace(/^[\^~]/, "");
+      const cleanReqd = version?.replace(/^[\^~]/, "");
+
+      let status: Status;
+      if (pkgNotFound || (label === "Peer Dependencies" && !installedVersion))
+        status = "default";
+      else if (!installedVersion) status = "missing";
+      else {
+        const installedMajor = semver.major(cleanInstalled);
+        const requiredMajor = semver.major(cleanReqd);
+
+        if (semver.eq(cleanInstalled, cleanReqd)) status = "ok";
+        else if (installedMajor !== requiredMajor) status = "majorMismatch";
+        else status = "minorMismatch";
+      }
+
+      logger.log(`${reqd}${installed}`, { level: 1 }, indicator[status]);
     }
 
     logger.break();
@@ -195,6 +219,12 @@ function logDependencies({
   );
 
   if (hasAnyDeps) {
+    if (pkgNotFound) {
+      logger.warn(
+        "package.json not found. Cannot detect installed dependencies."
+      );
+    }
+
     logger.break();
     logger.warn(description);
     logger.break();
@@ -227,6 +257,16 @@ function normalizeName(property: any): any {
   return property; // fallback
 }
 
+function dedupeCaseInsensitive(arr: string[]): string[] {
+  const seen = new Set<string>();
+  return arr.filter((item) => {
+    const lower = item.toLowerCase();
+    if (seen.has(lower)) return false;
+    seen.add(lower);
+    return true;
+  });
+}
+
 export {
   loadInstalledRegistry,
   updateInstalledRegistry,
@@ -236,4 +276,5 @@ export {
   addPathAlias,
   logDependencies,
   normalizeName,
+  dedupeCaseInsensitive,
 };

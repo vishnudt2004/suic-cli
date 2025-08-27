@@ -17,7 +17,7 @@ const cli: CLIDef = {
   description: `Manage and install ${chalk.whiteBright(
     "Simple UI Components"
   )} effortlessly.`,
-  helpText: cliUi.helpText,
+  help: cliUi.helpText,
   version: cliUi.version,
 };
 
@@ -39,7 +39,8 @@ commands.forEach((command) => registerCommand(program, command));
   {
     evt: "SIGINT",
     cb: () => {
-      logger.log("\nExiting...", undefined, chalk.redBright("✖"));
+      logger.break();
+      logger.log("Exiting...", undefined, chalk.redBright("✖"));
       process.exit(0);
     },
   },

@@ -18,7 +18,7 @@ export function registerCli(
     brandLogo,
     name,
     description,
-    helpText,
+    help,
     version,
     style = cliStyle || {},
   }: CLIDef
@@ -27,7 +27,7 @@ export function registerCli(
     .name(name)
     .addHelpText("beforeAll", `\n${brandLogo}\n`)
     .description(description)
-    .addHelpText("after", helpText)
+    .addHelpText("after", help)
     .version(version)
     .configureHelp(style);
 }

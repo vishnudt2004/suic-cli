@@ -1,7 +1,11 @@
 import chalk from "chalk";
 
-export const ENV = {
-  MODE: "DEV",
+type ENVType = {
+  MODE: "DEV" | "PROD";
+};
+
+export const ENV: ENVType = {
+  MODE: "PROD",
 };
 
 export const constants = {
@@ -11,7 +15,7 @@ export const constants = {
   INIT_REG_FILE: "registries/init.json",
   COMPS_REG_FILE: "registries/components.json",
   CONFIG_FILE: "suic.config.json",
-  DEFAULT_INSTALL_PATH: "/src/suic",
+  DEFAULT_INSTALL_PATH: "./src/suic",
 
   // CLIENT
   INSTALLED_REG_FILE: ".suic/installed-registry.json",

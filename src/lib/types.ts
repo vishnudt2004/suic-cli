@@ -4,7 +4,7 @@ export type CLIDef = {
   name: string;
   brandLogo: string;
   description: string;
-  helpText: string;
+  help: string;
   version: string;
   style?: HelpConfiguration;
 };

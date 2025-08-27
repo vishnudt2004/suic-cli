@@ -8,19 +8,21 @@ import { createConfig, getConfig } from "./utils/config";
 import { fetchRegistry } from "./utils/fetch";
 import { CLIError } from "./utils/error-handler";
 import {
-  addPathAlias,
+  loadInstalledRegistry,
+  updateInstalledRegistry,
   installFiles,
   removeFiles,
-  loadInstalledRegistry,
+  removeEmptyDirs,
+  addPathAlias,
   logDependencies,
   normalizeName,
-  updateInstalledRegistry,
-  removeEmptyDirs,
+  dedupeCaseInsensitive,
 } from "./utils/install-manager";
 import type {
   CommandDef,
   ComponentsRegistryEntry,
   InitRegistry,
+  InstalledRegistryEntry,
 } from "./lib/types";
 
 const {
@@ -39,6 +41,10 @@ const DEP_KEYS = [
   "devDependencies",
   "peerDependencies",
 ] as const;
+
+// shared helper function
+const logList = (items: string[]) =>
+  items.map((i) => `${chalk.gray("●")} ${chalk.cyanBright(i)}`).join(", ");
 
 const init: CommandDef = {
   command: "init",
@@ -88,7 +94,7 @@ const init: CommandDef = {
     if (registry.additionalInstructions?.length) {
       logger.info("Additional setup instructions:");
       for (const i of registry.additionalInstructions) {
-        logger.log(`${i.title}:`, { level: 1 }, "●");
+        logger.log(`${i.title}:`, { level: 1 }, "▪");
         logger.log(i.description, { level: 2 });
       }
       logger.break();
@@ -122,6 +128,11 @@ const add: CommandDef = {
       loadInstalledRegistry(cwd);
     const normalizedInstalledRegistry = normalizeName(installedRegistry);
 
+    // reshape registry
+    const catalogByName = Object.fromEntries(
+      componentsRegistry.map((c) => [normalizeName(c.name), c])
+    );
+
     // prompt if none specified
     if (!componentArgs?.length) {
       componentArgs = await askMultiSelect(
@@ -129,11 +140,6 @@ const add: CommandDef = {
         componentsRegistry.map((c) => c.name)
       );
     }
-
-    // reshape registry
-    const catalogByName = Object.fromEntries(
-      componentsRegistry.map((c) => [normalizeName(c.name), c])
-    );
 
     // collect logs, deps
     type Logs = Record<"added" | "skipped" | "invalid", string[]>;
@@ -147,13 +153,16 @@ const add: CommandDef = {
       peerDependencies: {},
     };
 
-    for (const rawName of componentArgs) {
-      const compKey = normalizeName(rawName);
+    // remove duplicates
+    componentArgs = dedupeCaseInsensitive(componentArgs);
+
+    for (const rawArg of componentArgs) {
+      const compKey = normalizeName(rawArg);
       const comp = catalogByName[compKey];
 
       // handle invalid component
       if (!comp) {
-        logs.invalid.push(rawName);
+        logs.invalid.push(rawArg);
         continue;
       }
 
@@ -174,11 +183,8 @@ const add: CommandDef = {
       }
 
       // install component files
-      await installFiles(
-        comp.files,
-        baseUrl,
-        path.join(cwd, config.installPath)
-      );
+      const targetDir = path.join(cwd, config.installPath);
+      await installFiles(comp.files, baseUrl, targetDir);
       logs.added.push(comp.name);
 
       // update installed-registry
@@ -191,7 +197,6 @@ const add: CommandDef = {
     logger.break();
 
     // log messages
-    const logList = (arr: string[]) => arr.map(chalk.cyanBright).join(", ");
     if (logs.added.length) {
       // log req. deps
       logDependencies({
@@ -211,7 +216,9 @@ const add: CommandDef = {
     }
     if (logs.invalid.length) {
       logger.error(
-        `Not found in registry (failed components): ${logList(logs.invalid)}`
+        `Failed to add components (not found in the registry): ${logList(
+          logs.invalid
+        )}`
       );
     }
   },
@@ -228,6 +235,8 @@ const remove: CommandDef = {
     // load installed-registry
     const { installedRegistryPath, installedRegistry } =
       loadInstalledRegistry(cwd);
+
+    // reshape registry
     const installedNames = Object.keys(installedRegistry);
     const normalizedMap = new Map(
       installedNames.map((name) => [normalizeName(name), name])
@@ -248,40 +257,20 @@ const remove: CommandDef = {
       );
     }
 
-    // collect logs, deps, files
+    // collect logs, entries
     type Logs = Record<"removed" | "invalid", string[]>;
-    type Deps = Record<
-      "allRemovedDeps" | "remainingDeps",
-      Record<
-        "dependencies" | "devDependencies" | "peerDependencies",
-        Record<string, string>
-      >
-    >;
     const logs: Logs = { removed: [], invalid: [] };
-    const deps: Deps = {
-      allRemovedDeps: {
-        dependencies: {},
-        devDependencies: {},
-        peerDependencies: {},
-      },
-      remainingDeps: {
-        dependencies: {},
-        devDependencies: {},
-        peerDependencies: {},
-      },
-    };
-    const files: Record<"allRemovedFiles" | "remainingFiles", string[]> = {
-      allRemovedFiles: [],
-      remainingFiles: [],
+    type Entries = Record<
+      "removedEntries" | "remainingEntries",
+      Record<string, InstalledRegistryEntry>
+    >;
+    const entries: Entries = {
+      removedEntries: {},
+      remainingEntries: {},
     };
 
-    // collect remaining deps, files
-    for (const comp of Object.values(installedRegistry)) {
-      DEP_KEYS.forEach((key) =>
-        Object.assign(deps.remainingDeps[key], comp[key] ?? {})
-      );
-      files.remainingFiles.push(...comp.files);
-    }
+    // remove duplicates
+    componentArgs = dedupeCaseInsensitive(componentArgs);
 
     for (const rawArg of componentArgs) {
       const compKey = normalizeName(rawArg);
@@ -293,78 +282,69 @@ const remove: CommandDef = {
         continue;
       }
 
-      // update installed-registry
+      // collect removed entries
+      const removedEntry = installedRegistry[regName];
+      if (removedEntry) entries.removedEntries[regName] = removedEntry;
+
+      // update installed-registry, in-memory copy
       updateInstalledRegistry(regName, installedRegistryPath, "remove");
-      logs.removed.push(regName);
-
-      // collect removed deps, files
-      const comp = installedRegistry[regName];
-      DEP_KEYS.forEach((key) =>
-        Object.assign(deps.allRemovedDeps[key], comp[key] ?? {})
-      );
-      files.allRemovedFiles.push(...comp.files);
-
-      // subtract from remaining deps, files
-      DEP_KEYS.forEach((key) => {
-        for (const pkg of Object.keys(comp[key] ?? {})) {
-          delete deps.remainingDeps[key][pkg];
-        }
-      });
-      files.remainingFiles = files.remainingFiles.filter(
-        (f) => !comp.files.includes(f)
-      );
-
-      // update in-memory copy
       delete installedRegistry[regName];
+
+      logs.removed.push(regName);
     }
 
+    // collect remaining entries
+    entries.remainingEntries = { ...installedRegistry };
+
     // helper IIFE
-    const { unusedDeps, unusedFiles } = (function filterUnused(
-      deps: Deps,
-      files: Record<"allRemovedFiles" | "remainingFiles", string[]>
-    ) {
+    const { unusedDeps, unusedFiles } = ((entries: Entries) => {
       const DEP_KEYS = [
         "dependencies",
         "devDependencies",
         "peerDependencies",
       ] as const;
 
-      const unusedDeps: Record<
-        (typeof DEP_KEYS)[number],
-        Record<string, string>
-      > = {
-        dependencies: {},
-        devDependencies: {},
-        peerDependencies: {},
-      };
+      const keepDeps = new Set<string>();
+      const keepFiles = new Set<string>();
 
-      for (const key of DEP_KEYS) {
-        for (const [pkg, version] of Object.entries(deps.allRemovedDeps[key])) {
-          if (!(pkg in deps.remainingDeps[key])) {
-            unusedDeps[key][pkg] = version;
-          }
-        }
-      }
+      // extract deps, files from remaining
+      Object.values(entries.remainingEntries).forEach((entry) => {
+        DEP_KEYS.forEach((k) =>
+          Object.keys(entry?.[k] ?? {}).forEach((dep) => keepDeps.add(dep))
+        );
+        entry?.files?.forEach((f) => keepFiles.add(f));
+      });
 
-      const unusedFiles = files.allRemovedFiles.filter(
-        (file) => !files.remainingFiles.includes(file)
-      );
+      const unusedDeps = Object.fromEntries(
+        DEP_KEYS.map((k) => [k, {}])
+      ) as Record<(typeof DEP_KEYS)[number], Record<string, string>>;
+      const unusedFilesSet = new Set<string>();
 
-      return { unusedDeps, unusedFiles };
-    })(deps, files);
+      // compute unused deps, files
+      Object.values(entries.removedEntries).forEach((entry) => {
+        DEP_KEYS.forEach((k) =>
+          Object.entries(entry?.[k] ?? {}).forEach(([dep, ver]) => {
+            if (!keepDeps.has(dep)) unusedDeps[k][dep] = ver;
+          })
+        );
+        entry?.files?.forEach((f) => {
+          if (!keepFiles.has(f)) unusedFilesSet.add(f);
+        });
+      });
+
+      return { unusedDeps, unusedFiles: Array.from(unusedFilesSet) };
+    })(entries);
 
     // remove component files, empty folders
     if (unusedFiles.length) {
-      removeFiles(unusedFiles, path.join(cwd, config.installPath));
-      removeEmptyDirs(path.join(cwd, config.installPath), unusedFiles, [
-        path.join(cwd, config.installPath, "components"),
-      ]);
+      const targetDir = path.join(cwd, config.installPath);
+      removeFiles(unusedFiles, targetDir);
+      removeEmptyDirs(targetDir, unusedFiles, [targetDir]);
     }
 
     logger.break();
 
     // log messages
-    const logList = (arr: string[]) => arr.map(chalk.cyanBright).join(", ");
     if (logs.removed.length) {
       // log unused deps
       logDependencies({

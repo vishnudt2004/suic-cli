@@ -24,9 +24,9 @@ export function handleError(err: unknown, level = 0) {
         handleError((err as any).cause, level + 1);
       } else if (level === 0) {
         // PROD: show just first-level cause
-        logger.error(
-          `Cause: ${(err as any).cause?.message || "Unknown error"}`
-        );
+        logger.log(`Cause: ${(err as any).cause?.message || "Unknown error"}`, {
+          level: level + 1,
+        });
       }
     }
 
