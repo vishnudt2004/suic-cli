@@ -11,17 +11,15 @@ const logMessage = (
   indent: Indent = { char: " ", level: 0 }
 ) => {
   console[method](
-    (indent.char || " ").repeat(indent.level || 0),
-    prefix,
-    colorFn(msg)
+    (indent.char || " ").repeat(indent.level || 0) + prefix + colorFn(msg)
   );
 };
 
-export const logger = {
+const core = {
   log: (msg: string, indent?: Indent, symbol: string = "") =>
     logMessage(
       msg,
-      (txt) => symbol + " " + chalk.whiteBright(txt),
+      (txt) => (symbol ? symbol + " " : "") + chalk.whiteBright(txt),
       "log",
       indent
     ),
@@ -53,6 +51,9 @@ export const logger = {
       "error",
       indent
     ),
+};
+
+const utils = {
   break: (n: number = 0) => console.log("\n".repeat(n)), // n=1 prints 2 line breaks
   divider: (
     n: number = 30,
@@ -62,4 +63,32 @@ export const logger = {
     console.log(
       (indent.char || " ").repeat(indent.level || 0) + char.repeat(n)
     ),
+  title: (
+    title: string,
+    symbol: string = "",
+    divider: {
+      char?: string;
+      length: number;
+      prefix?: string;
+      postfix?: string;
+    } = { char: "-", length: 0 },
+    indent: Indent = { char: " ", level: 0 }
+  ) => {
+    logMessage(
+      title,
+      (txt) => (symbol ? symbol + " " : "") + chalk.whiteBright(txt),
+      "log",
+      indent
+    );
+    if (divider?.length > 0)
+      console.log(
+        (indent.char || " ").repeat(indent.level || 0) +
+          `${divider.prefix || ""}${(divider.char || "-").repeat(
+            divider.length
+          )}${divider.postfix || ""}`
+      );
+    utils.break();
+  },
 };
+
+export const logger = { ...core, ...utils };

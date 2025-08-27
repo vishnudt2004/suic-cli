@@ -1,6 +1,6 @@
 import path from "path";
 import chalk from "chalk";
-import { constants } from "./constants";
+import { cliUi, constants } from "./constants";
 import { buildUrl } from "./utils/url-utils";
 import { askConfirm, askMultiSelect } from "./utils/prompt-handler";
 import { logger } from "./utils/logger";
@@ -376,4 +376,54 @@ const remove: CommandDef = {
   errDescription: "Error in component removal",
 };
 
-export const commands = [init, add, remove];
+const list: CommandDef = {
+  command: "list",
+  description: "Show all available components with descriptions",
+  action: async () => {
+    // fetch components registry
+    const componentsRegistry = await fetchRegistry<ComponentsRegistryEntry[]>(
+      componentsRegUrl,
+      "Failed to fetch components registry"
+    );
+
+    // reshape registry
+    const mapDescrByName = Object.fromEntries(
+      componentsRegistry.map((c) => [c.name, c.description])
+    );
+
+    // handle empty registry
+    if (!Object.keys(mapDescrByName).length)
+      throw new CLIError("No components available.");
+
+    // display brand logo
+    logger.break();
+    logger.title(cliUi.logo);
+
+    // log list
+    const title = "Available components:";
+    logger.title(title, undefined, {
+      char: "═ ",
+      length: Math.ceil((title.length + 1) / 2),
+    });
+
+    for (const [comp, descr] of Object.entries(mapDescrByName)) {
+      logger.log(`${chalk.blueBright(comp)}`, { level: 1 }, chalk.gray("●"));
+      logger.log(`${descr || chalk.gray.dim("(no description)")}`, {
+        level: 3,
+      });
+      logger.break();
+    }
+
+    // log short instr.
+    logger.break();
+    logger.info(
+      `Use '${chalk.green("suic-cli add [components...]")}' to install.`
+    );
+    logger.info(
+      `Or run '${chalk.green("suic-cli add")}' to select from the list.`
+    );
+  },
+  errDescription: "Error in listing components",
+};
+
+export const commands = [init, add, remove, list];
