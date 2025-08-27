@@ -15,6 +15,7 @@ import {
   removeEmptyDirs,
   addPathAlias,
   logDependencies,
+  sanitizeInstallPath,
   normalizeName,
   dedupeCaseInsensitive,
 } from "./utils/install-manager";
@@ -64,7 +65,9 @@ const init: CommandDef = {
     if (!confirmed) return logger.info("Initialization cancelled.");
 
     // create config
-    const installPath = opts.installPath || dfltInstallPath;
+    const installPath = sanitizeInstallPath(
+      opts.installPath || dfltInstallPath
+    );
     createConfig({ installPath });
 
     // fetch init registry

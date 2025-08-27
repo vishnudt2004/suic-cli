@@ -5,6 +5,7 @@ import { constants } from "../constants";
 import { fetchFileData } from "./fetch";
 import { buildUrl } from "./url-utils";
 import { logger } from "./logger";
+import { CLIError } from "./error-handler";
 import type {
   ComponentsRegistryEntry,
   InstalledRegistryEntry,
@@ -244,6 +245,25 @@ function logDependencies({
   printDeps(peerDependencies, "Peer Dependencies");
 }
 
+function sanitizeInstallPath(input: string): string {
+  // Allow only safe characters: a-z, 0-9, dash, underscore, slash
+  // + optional dot prefix for relative paths
+  const isValid = /^\.?\/?[a-zA-Z0-9/_-]+$/.test(input);
+  if (!isValid) {
+    throw new CLIError(
+      `Invalid path: "${input}". Allowed: a–z, 0–9, "-", "_". Use "/" for directories.`
+    );
+  }
+
+  // Remove leading "./" or "/" to keep it relative under src/
+  let clean = input.replace(/^(\.\/|\/)+/, "");
+
+  // Normalize slashes (avoid .//, etc.)
+  clean = path.posix.normalize(clean);
+
+  return `./${clean}`;
+}
+
 function normalizeName(property: string): string;
 function normalizeName<T extends { name: string }>(property: T[]): T[];
 function normalizeName<T extends Record<string, any>>(
@@ -284,6 +304,7 @@ export {
   removeEmptyDirs,
   addPathAlias,
   logDependencies,
+  sanitizeInstallPath,
   normalizeName,
   dedupeCaseInsensitive,
 };
