@@ -88,6 +88,7 @@ const init: CommandDef = {
       )}):`,
       registryDeps: registry,
       cwd,
+      action: "install",
     });
 
     // log additional instr.
@@ -205,6 +206,7 @@ const add: CommandDef = {
         )}):`,
         registryDeps: reqdDeps,
         cwd,
+        action: "install",
       });
 
       logger.success(`Successfully added components: ${logList(logs.added)}`);
@@ -353,6 +355,7 @@ const remove: CommandDef = {
         )}):`,
         registryDeps: unusedDeps,
         cwd,
+        action: "uninstall",
       });
 
       logger.success(

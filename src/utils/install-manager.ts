@@ -149,9 +149,15 @@ type LogDeps = {
     "dependencies" | "devDependencies" | "peerDependencies"
   >;
   cwd: string;
+  action: "install" | "uninstall";
 };
 
-function logDependencies({ description, registryDeps, cwd }: LogDeps): void {
+function logDependencies({
+  description,
+  registryDeps,
+  cwd,
+  action,
+}: LogDeps): void {
   const { dependencies, devDependencies, peerDependencies } = registryDeps;
 
   const pkgPath = path.join(cwd, "package.json");
@@ -189,24 +195,27 @@ function logDependencies({ description, registryDeps, cwd }: LogDeps): void {
     for (const [dep, version] of Object.entries(deps)) {
       const installedVersion = installedDeps[dep];
       const reqd = `${chalk.cyanBright(dep)}@${version}`;
-      const installed = installedVersion
-        ? ` (${chalk.dim(`installed: ${installedVersion}`)})`
-        : "";
+      const installed =
+        action === "install" && installedVersion
+          ? ` (${chalk.dim(`installed: ${installedVersion}`)})`
+          : "";
       const cleanInstalled = installedVersion?.replace(/^[\^~]/, "");
       const cleanReqd = version?.replace(/^[\^~]/, "");
 
       let status: Status;
-      if (pkgNotFound || (label === "Peer Dependencies" && !installedVersion))
-        status = "default";
-      else if (!installedVersion) status = "missing";
-      else {
-        const installedMajor = semver.major(cleanInstalled);
-        const requiredMajor = semver.major(cleanReqd);
+      if (action === "install") {
+        if (pkgNotFound || (label === "Peer Dependencies" && !installedVersion))
+          status = "default";
+        else if (!installedVersion) status = "missing";
+        else {
+          const installedMajor = semver.major(cleanInstalled);
+          const requiredMajor = semver.major(cleanReqd);
 
-        if (semver.eq(cleanInstalled, cleanReqd)) status = "ok";
-        else if (installedMajor !== requiredMajor) status = "majorMismatch";
-        else status = "minorMismatch";
-      }
+          if (semver.eq(cleanInstalled, cleanReqd)) status = "ok";
+          else if (installedMajor !== requiredMajor) status = "majorMismatch";
+          else status = "minorMismatch";
+        }
+      } else status = "default";
 
       logger.log(`${reqd}${installed}`, { level: 1 }, indicator[status]);
     }
@@ -219,7 +228,7 @@ function logDependencies({ description, registryDeps, cwd }: LogDeps): void {
   );
 
   if (hasAnyDeps) {
-    if (pkgNotFound) {
+    if (action === "install" && pkgNotFound) {
       logger.warn(
         "package.json not found. Cannot detect installed dependencies."
       );
