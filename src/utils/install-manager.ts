@@ -170,6 +170,9 @@ function logDependencies({
 
   const installedDeps = { ...pkg.dependencies, ...pkg.devDependencies };
 
+  const normalizeVersion = (v: string) =>
+    (v && (semver.clean(v) ?? semver.coerce(v)?.version)) ?? null;
+
   const printDeps = (
     deps: Record<string, string> | undefined,
     label: string
@@ -200,14 +203,18 @@ function logDependencies({
         action === "install" && installedVersion
           ? ` (${chalk.dim(`installed: ${installedVersion}`)})`
           : "";
-      const cleanInstalled = installedVersion?.replace(/^[\^~]/, "");
-      const cleanReqd = version?.replace(/^[\^~]/, "");
+      const cleanInstalled = normalizeVersion(installedVersion);
+      const cleanReqd = normalizeVersion(version);
 
       let status: Status;
       if (action === "install") {
-        if (pkgNotFound || (label === "Peer Dependencies" && !installedVersion))
+        if (
+          pkgNotFound ||
+          (label === "Peer Dependencies" && !installedVersion) ||
+          !cleanReqd
+        )
           status = "default";
-        else if (!installedVersion) status = "missing";
+        else if (!cleanInstalled) status = "missing";
         else {
           const installedMajor = semver.major(cleanInstalled);
           const requiredMajor = semver.major(cleanReqd);
