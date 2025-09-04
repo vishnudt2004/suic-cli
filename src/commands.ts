@@ -27,6 +27,7 @@ import type {
 } from "./lib/types";
 
 const {
+  COMPS_DOC_URL: compsDocUrl,
   DEFAULT_INSTALL_PATH: dfltInstallPath,
   BASE_URL: baseUrl,
   INIT_REG_FILE,
@@ -137,6 +138,10 @@ const add: CommandDef = {
       componentsRegistry.map((c) => [normalizeName(c.name), c])
     );
 
+    // handle empty registry
+    if (!Object.keys(catalogByName).length)
+      throw new CLIError("No components available.");
+
     // prompt if none specified
     if (!componentArgs?.length) {
       componentArgs = await askMultiSelect(
@@ -225,6 +230,10 @@ const add: CommandDef = {
           logs.invalid
         )}`
       );
+    }
+    if (logs.added.length) {
+      logger.break();
+      logger.info(`${chalk.gray.italic("Docs:")} ${chalk.blue(compsDocUrl)}`);
     }
   },
   errDescription: "Error in component installation",
@@ -388,7 +397,10 @@ const list: CommandDef = {
 
     // reshape registry
     const mapDescrByName = Object.fromEntries(
-      componentsRegistry.map((c) => [c.name, c.description])
+      componentsRegistry.map((c) => [
+        c.name,
+        { description: c.description, docUrl: c.docUrl },
+      ])
     );
 
     // handle empty registry
@@ -406,9 +418,14 @@ const list: CommandDef = {
       length: Math.ceil((title.length + 1) / 2),
     });
 
-    for (const [comp, descr] of Object.entries(mapDescrByName)) {
+    for (const [comp, { description, docUrl }] of Object.entries(
+      mapDescrByName
+    )) {
       logger.log(`${chalk.blueBright(comp)}`, { level: 1 }, chalk.gray("●"));
-      logger.log(`${descr || chalk.gray.dim("(no description)")}`, {
+      logger.log(`${description || chalk.gray.dim("(no description)")}`, {
+        level: 3,
+      });
+      logger.log(`${chalk.gray.italic("Docs: ")}${chalk.blue(docUrl)}`, {
         level: 3,
       });
       logger.break();

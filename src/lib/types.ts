@@ -32,6 +32,7 @@ export type InitRegistry = {
 export type ComponentsRegistryEntry = {
   name: string;
   description: string;
+  docUrl: string;
   files: string[];
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;

@@ -9,9 +9,10 @@ export const ENV: ENVType = {
 };
 
 export const constants = {
-  CLI_DOCS_URL: "https://suic-docs.vercel.app/docs/cli",
+  CLI_DOC_URL: "https://suic-docs.vercel.app/docs/cli",
+  COMPS_DOC_URL: "https://suic-docs.vercel.app/docs/components",
 
-  BASE_URL: "https://raw.githubusercontent.com/vishnudt2004/test-repo/main/",
+  BASE_URL: "https://raw.githubusercontent.com/vishnudt2004/suic-core/main/",
   INIT_REG_FILE: "registries/init.json",
   COMPS_REG_FILE: "registries/components.json",
   CONFIG_FILE: "suic.config.json",
@@ -33,6 +34,6 @@ export const cliUi = {
     .whiteBright(" Components ")}`,
   helpText: `\n${chalk.bold.hex("#9CA3AF")(
     "Documentation:"
-  )} ${chalk.underline.hex("#60a5fa")(constants.CLI_DOCS_URL)}\n`,
+  )} ${chalk.underline.hex("#60a5fa")(constants.CLI_DOC_URL)}\n`,
   version: chalk.green("suic-cli v1.0.0"),
 };
