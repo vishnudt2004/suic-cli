@@ -29,7 +29,7 @@ npx suic-cli
 ```
 
 <p align="center">
-  <img src="./demo/suic-cli-v1.0.0 [suic-cli].png" alt="SUIC CLI demo" />
+  <img src="./demo/suic-cli-v1.0.0-demo.png" alt="SUIC CLI demo" />
 </p>
 
 ---
